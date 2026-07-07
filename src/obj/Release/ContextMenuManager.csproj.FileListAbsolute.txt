@@ -1,0 +1,13 @@
+D:\Coding\MyContextMenu\src\bin\Release\ContextMenuManager.exe
+D:\Coding\MyContextMenu\src\obj\Release\ContextMenuManager.csprojAssemblyReference.cache
+D:\Coding\MyContextMenu\src\obj\Release\MainWindow.baml
+D:\Coding\MyContextMenu\src\obj\Release\AddItemWindow.baml
+D:\Coding\MyContextMenu\src\obj\Release\App.baml
+D:\Coding\MyContextMenu\src\obj\Release\MainWindow.g.cs
+D:\Coding\MyContextMenu\src\obj\Release\AddItemWindow.g.cs
+D:\Coding\MyContextMenu\src\obj\Release\App.g.cs
+D:\Coding\MyContextMenu\src\obj\Release\ContextMenuManager_MarkupCompile.cache
+D:\Coding\MyContextMenu\src\obj\Release\ContextMenuManager.g.resources
+D:\Coding\MyContextMenu\src\obj\Release\ContextMenuManager.exe
+D:\Coding\MyContextMenu\src\obj\Release\GeneratedInternalTypeHelper.g.cs
+D:\Coding\MyContextMenu\src\obj\Release\ContextMenuManager_MarkupCompile.lref
