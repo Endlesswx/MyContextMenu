@@ -8,21 +8,21 @@
         FontFamily="Microsoft YaHei UI, Segoe UI, sans-serif" FontSize="13">
     <DockPanel>
         <!-- 顶部说明 -->
-        <Border DockPanel.Dock="Top" Background="White" BorderBrush="{StaticResource BorderGray}"
-                BorderThickness="0,0,0,1" Padding="18,14">
+        <Border DockPanel.Dock="Top" Background="White" BorderBrush="#E5E7EB"
+                BorderThickness="0,0,0,1" Padding="20,16">
             <StackPanel>
-                <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="#222222">
+                <TextBlock FontSize="17" FontWeight="SemiBold" Foreground="#111827">
                     关联软件映射规则
                 </TextBlock>
-                <TextBlock Margin="0,6,0,0" Foreground="#666666" TextWrapping="Wrap">
+                <TextBlock Margin="0,8,0,0" Foreground="#6B7280" TextWrapping="Wrap" LineHeight="20">
                     程序会在菜单项的名称、命令、DLL路径等信息中搜索关键字（不区分大小写），匹配成功后在「关联软件」列显示对应的软件名称。
                 </TextBlock>
             </StackPanel>
         </Border>
 
         <!-- 底部按钮 -->
-        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="{StaticResource BorderGray}"
-                BorderThickness="0,1,0,0" Padding="18,10">
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#E5E7EB"
+                BorderThickness="0,1,0,0" Padding="20,12">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="BtnSave" Style="{StaticResource PrimaryBtn}" Content="保存" Click="BtnSave_Click"/>
                 <Button x:Name="BtnCancel" Style="{StaticResource Btn}" Content="取消" Margin="0" Click="BtnCancel_Click"/>
@@ -30,10 +30,10 @@
         </Border>
 
         <!-- 主区域 -->
-        <DockPanel Margin="18,14,18,14">
+        <DockPanel Margin="20,16,20,16">
             <!-- 工具栏 -->
-            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
-                <Button x:Name="BtnAdd" Style="{StaticResource Btn}" Content="＋ 新增映射" Click="BtnAdd_Click"/>
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
+                <Button x:Name="BtnAdd" Style="{StaticResource PrimaryBtn}" Content="＋ 新增映射" Click="BtnAdd_Click"/>
                 <Button x:Name="BtnEdit" Style="{StaticResource Btn}" Content="编辑" Click="BtnEdit_Click"/>
                 <Button x:Name="BtnDelete" Style="{StaticResource Btn}" Content="删除" Click="BtnDelete_Click"/>
                 <Button x:Name="BtnReload" Style="{StaticResource Btn}" Content="重新加载" Margin="0" Click="BtnReload_Click"
@@ -41,19 +41,26 @@
             </StackPanel>
 
             <!-- 列表 -->
-            <Border Background="White" BorderBrush="{StaticResource BorderGray}"
-                    BorderThickness="1" CornerRadius="4">
+            <Border Background="White" BorderBrush="#E5E7EB"
+                    BorderThickness="1" CornerRadius="8">
                 <Grid>
                     <ListView x:Name="MappingList" BorderThickness="0" AlternationCount="2"
                               SelectionMode="Single" MouseDoubleClick="MappingList_MouseDoubleClick">
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
-                                <Setter Property="MinHeight" Value="32"/>
-                                <Setter Property="Padding" Value="4,2"/>
+                                <Setter Property="MinHeight" Value="38"/>
+                                <Setter Property="Padding" Value="6,3"/>
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                 <Style.Triggers>
                                     <Trigger Property="ItemsControl.AlternationIndex" Value="1">
-                                        <Setter Property="Background" Value="#FAFBFC"/>
+                                        <Setter Property="Background" Value="#F9FAFB"/>
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#EFF6FF"/>
+                                        <Setter Property="BorderBrush" Value="#BFDBFE"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#F0F9FF"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
@@ -64,14 +71,15 @@
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding Key}" VerticalAlignment="Center"
-                                                       FontFamily="Consolas, Courier New"/>
+                                                       FontFamily="Consolas, Courier New" Foreground="#374151"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
                                 <GridViewColumn Header="软件名称" Width="400">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding Value}" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Value}" VerticalAlignment="Center" 
+                                                       Foreground="#111827" FontWeight="Medium"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
@@ -79,7 +87,7 @@
                         </ListView.View>
                     </ListView>
                     <TextBlock x:Name="EmptyHint" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               Foreground="#999999" FontSize="13" Text="暂无映射规则"
+                               Foreground="#9CA3AF" FontSize="14" Text="暂无映射规则"
                                Visibility="Collapsed"/>
                 </Grid>
             </Border>

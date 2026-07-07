@@ -134,5 +134,6 @@ namespace ContextMenuManager
         public string Description { get; set; }
         public int? Count { get; set; }
         public string CountText { get { return Count.HasValue ? Count.Value.ToString() : ""; } }
+        public string Icon { get; set; }
     }
 }

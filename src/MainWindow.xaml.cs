@@ -17,21 +17,21 @@ namespace ContextMenuManager
     {
         private readonly List<CategoryInfo> _categories = new List<CategoryInfo>
         {
-            new CategoryInfo { Id = CategoryId.DesktopBackground, Title = "桌面右键菜单",
+            new CategoryInfo { Id = CategoryId.DesktopBackground, Title = "桌面右键菜单", Icon = "🖥️",
                 Description = "管理在桌面空白处（以及文件夹窗口空白处）单击右键时显示的菜单项。" },
-            new CategoryInfo { Id = CategoryId.NewMenu, Title = "「新建」菜单",
+            new CategoryInfo { Id = CategoryId.NewMenu, Title = "「新建」菜单", Icon = "➕",
                 Description = "管理右键「新建」子菜单中的项目。屏蔽仅将其从「新建」菜单移除（随时可恢复），不影响该类型文件的打开方式。" },
-            new CategoryInfo { Id = CategoryId.AllFiles, Title = "文件右键菜单",
+            new CategoryInfo { Id = CategoryId.AllFiles, Title = "文件右键菜单", Icon = "📄",
                 Description = "管理右键任意文件时显示的菜单项（对所有文件类型生效）。特定类型文件独有的菜单请使用「按后缀名查询」。" },
-            new CategoryInfo { Id = CategoryId.Folders, Title = "文件夹右键菜单",
+            new CategoryInfo { Id = CategoryId.Folders, Title = "文件夹右键菜单", Icon = "📁",
                 Description = "管理右键文件夹时显示的菜单项。" },
-            new CategoryInfo { Id = CategoryId.Drives, Title = "驱动器右键菜单",
+            new CategoryInfo { Id = CategoryId.Drives, Title = "驱动器右键菜单", Icon = "💾",
                 Description = "管理右键磁盘驱动器（如 C:、D:）时显示的菜单项。" },
-            new CategoryInfo { Id = CategoryId.SendTo, Title = "「发送到」菜单",
+            new CategoryInfo { Id = CategoryId.SendTo, Title = "「发送到」菜单", Icon = "📤",
                 Description = "管理右键「发送到」子菜单中的项目。屏蔽 = 设为隐藏（可随时恢复）；新增 = 在发送到文件夹中创建快捷方式。" },
-            new CategoryInfo { Id = CategoryId.ByExtension, Title = "按后缀名查询",
+            new CategoryInfo { Id = CategoryId.ByExtension, Title = "按后缀名查询", Icon = "🔤",
                 Description = "输入文件后缀名（如 .txt、.jpg），查询并管理该类型文件特有的右键菜单项（含其关联程序与「新建」模板）。" },
-            new CategoryInfo { Id = CategoryId.GlobalSearch, Title = "全局搜索",
+            new CategoryInfo { Id = CategoryId.GlobalSearch, Title = "全局搜索", Icon = "🔍",
                 Description = "在所有分类中搜索匹配的菜单项，支持名称、命令、路径、关联软件等关键字检索。" },
         };
 
