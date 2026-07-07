@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace ContextMenuManager
 {
@@ -36,13 +37,23 @@ namespace ContextMenuManager
 
         private List<MenuEntry> _entries = new List<MenuEntry>();
         private List<MenuEntry> _globalSearchResults = new List<MenuEntry>(); // 全局搜索结果
+        private bool _globalSearchResultsCached = false; // 全局搜索结果是否已缓存
         private string _currentExt = "";
         private bool _suppressLoad;
         private bool _isGlobalSearchMode = false; // 是否处于全局搜索模式
+        private DispatcherTimer _searchDebounceTimer; // 搜索防抖定时器
+        private string _lastSearchText = ""; // 缓存上次搜索文本，避免重复搜索
 
         public MainWindow()
         {
             InitializeComponent();
+
+            // 初始化搜索防抖定时器
+            _searchDebounceTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(150) // 150ms 延迟
+            };
+            _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
 
             bool admin = MenuService.IsAdministrator();
             if (admin)
@@ -309,14 +320,43 @@ namespace ContextMenuManager
             if (_suppressLoad) return;
             SearchBox.Text = "";
             _isGlobalSearchMode = false; // 切换分类时退出全局搜索模式
+            _globalSearchResultsCached = false; // 清除缓存
             LoadCategory();
         }
 
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            SearchHint.Visibility = string.IsNullOrEmpty(SearchBox.Text) ? Visibility.Visible : Visibility.Collapsed;
+            // 最小化操作，只更新UI和启动定时器
+            bool isEmpty = string.IsNullOrEmpty(SearchBox.Text);
+            
+            // 只在状态改变时更新可见性
+            if (isEmpty && SearchHint.Visibility != Visibility.Visible)
+            {
+                SearchHint.Visibility = Visibility.Visible;
+            }
+            else if (!isEmpty && SearchHint.Visibility != Visibility.Collapsed)
+            {
+                SearchHint.Visibility = Visibility.Collapsed;
+            }
+            
+            // 重启定时器
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
+        }
+
+        /// <summary>搜索防抖定时器触发事件</summary>
+        private void SearchDebounceTimer_Tick(object sender, EventArgs e)
+        {
+            _searchDebounceTimer.Stop();
             
             string q = (SearchBox.Text ?? "").Trim();
+            
+            // 如果文本没变，跳过处理
+            if (q == _lastSearchText)
+            {
+                return;
+            }
+            _lastSearchText = q;
             
             // 如果搜索框有内容且不在全局搜索模式，自动切换到全局搜索
             if (q.Length > 0 && !_isGlobalSearchMode)
@@ -337,7 +377,7 @@ namespace ContextMenuManager
             }
             else
             {
-                // 在普通分类模式下，只在当前分类中过滤
+                // 普通分类模式下的过滤
                 ApplyFilter();
             }
         }
@@ -352,44 +392,58 @@ namespace ContextMenuManager
                 return;
             }
 
-            WithWaitCursor(delegate
+            // 如果缓存不存在，需要扫描所有分类（仅第一次）
+            if (!_globalSearchResultsCached)
             {
-                try
+                WithWaitCursor(delegate
                 {
-                    // 扫描所有分类
-                    _globalSearchResults = MenuService.ScanCategory(CategoryId.GlobalSearch);
-                    
-                    // 为所有项匹配关联软件
-                    SoftwareMappingService.MatchSoftwareForEntries(_globalSearchResults);
-                    
-                    // 过滤匹配关键字的项
-                    _entries = _globalSearchResults.Where(e =>
-                        ContainsIgnoreCase(e.DisplayName, keyword) ||
-                        ContainsIgnoreCase(e.RawName, keyword) ||
-                        ContainsIgnoreCase(e.Details, keyword) ||
-                        ContainsIgnoreCase(e.KeyPath, keyword) ||
-                        ContainsIgnoreCase(e.SourceLabel, keyword) ||
-                        ContainsIgnoreCase(e.AssociatedSoftware, keyword) ||
-                        ContainsIgnoreCase(e.CategoryName, keyword)
-                    ).ToList();
-                    
-                    CatTitle.Text = "全局搜索结果";
-                    CatDesc.Text = string.Format("在所有分类中搜索「{0}」，找到 {1} 项匹配结果。", keyword, _entries.Count);
-                    ExtPanel.Visibility = Visibility.Collapsed;
-                    Win11Tip.Visibility = Visibility.Collapsed;
-                }
-                catch (Exception ex)
-                {
-                    _entries = new List<MenuEntry>();
-                    SetStatus("全局搜索失败：" + ex.Message);
-                }
+                    try
+                    {
+                        // 扫描所有分类
+                        _globalSearchResults = MenuService.ScanCategory(CategoryId.GlobalSearch);
+                        
+                        // 为所有项匹配关联软件
+                        SoftwareMappingService.MatchSoftwareForEntries(_globalSearchResults);
+                        
+                        _globalSearchResultsCached = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        _globalSearchResults = new List<MenuEntry>();
+                        SetStatus("全局搜索失败：" + ex.Message);
+                    }
+                });
+            }
+            
+            // 基于缓存结果进行快速过滤
+            try
+            {
+                _entries = _globalSearchResults.Where(e =>
+                    ContainsIgnoreCase(e.DisplayName, keyword) ||
+                    ContainsIgnoreCase(e.RawName, keyword) ||
+                    ContainsIgnoreCase(e.Details, keyword) ||
+                    ContainsIgnoreCase(e.KeyPath, keyword) ||
+                    ContainsIgnoreCase(e.SourceLabel, keyword) ||
+                    ContainsIgnoreCase(e.AssociatedSoftware, keyword) ||
+                    ContainsIgnoreCase(e.CategoryName, keyword)
+                ).ToList();
+                
+                CatTitle.Text = "全局搜索结果";
+                CatDesc.Text = string.Format("在所有分类中搜索「{0}」，找到 {1} 项匹配结果。", keyword, _entries.Count);
+                ExtPanel.Visibility = Visibility.Collapsed;
+                Win11Tip.Visibility = Visibility.Collapsed;
+            }
+            catch (Exception ex)
+            {
+                _entries = new List<MenuEntry>();
+                SetStatus("过滤失败：" + ex.Message);
+            }
 
-                ItemList.ItemsSource = _entries;
-                var view = CollectionViewSource.GetDefaultView(ItemList.ItemsSource);
-                if (view != null) view.Filter = null; // 全局搜索已经过滤，不再需要额外过滤
-                ResetSort();
-                UpdateCountAndEmptyHint();
-            });
+            ItemList.ItemsSource = _entries;
+            var view = CollectionViewSource.GetDefaultView(ItemList.ItemsSource);
+            if (view != null) view.Filter = null; // 全局搜索已经过滤，不再需要额外过滤
+            ResetSort();
+            UpdateCountAndEmptyHint();
         }
 
         private void BtnExtQuery_Click(object sender, RoutedEventArgs e)
@@ -419,6 +473,7 @@ namespace ContextMenuManager
 
         private void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
+            _globalSearchResultsCached = false; // 清除缓存
             RefreshAllCounts();
             LoadCategory();
             SetStatus("已刷新");
@@ -598,6 +653,7 @@ namespace ContextMenuManager
             try
             {
                 MenuService.SetEnabled(entry, target);
+                _globalSearchResultsCached = false; // 清除缓存，因为状态已改变
                 ItemList.Items.Refresh();
                 UpdateCountAndEmptyHint();
                 if (entry.Kind == EntryKind.PackagedShellNew)
@@ -649,6 +705,7 @@ namespace ContextMenuManager
             {
                 string backup = MenuService.DeleteEntry(entry);
                 SetStatus("已删除：" + entry.DisplayName + "，备份位于 " + backup);
+                _globalSearchResultsCached = false; // 清除缓存，因为数据已改变
                 LoadCategory();
             }
             catch (Exception ex)
@@ -732,6 +789,7 @@ namespace ContextMenuManager
             var dlg = new AddItemWindow(cat == null ? CategoryId.AllFiles : cat.Id, _currentExt) { Owner = this };
             if (dlg.ShowDialog() == true)
             {
+                _globalSearchResultsCached = false; // 清除缓存，因为新增了项
                 // 切换到新增项所属分类并刷新
                 foreach (var c in _categories)
                 {
