@@ -30,11 +30,15 @@ namespace ContextMenuManager
                 Description = "管理右键「发送到」子菜单中的项目。屏蔽 = 设为隐藏（可随时恢复）；新增 = 在发送到文件夹中创建快捷方式。" },
             new CategoryInfo { Id = CategoryId.ByExtension, Title = "按后缀名查询",
                 Description = "输入文件后缀名（如 .txt、.jpg），查询并管理该类型文件特有的右键菜单项（含其关联程序与「新建」模板）。" },
+            new CategoryInfo { Id = CategoryId.GlobalSearch, Title = "全局搜索",
+                Description = "在所有分类中搜索匹配的菜单项，支持名称、命令、路径、关联软件等关键字检索。" },
         };
 
         private List<MenuEntry> _entries = new List<MenuEntry>();
+        private List<MenuEntry> _globalSearchResults = new List<MenuEntry>(); // 全局搜索结果
         private string _currentExt = "";
         private bool _suppressLoad;
+        private bool _isGlobalSearchMode = false; // 是否处于全局搜索模式
 
         public MainWindow()
         {
@@ -94,7 +98,7 @@ namespace ContextMenuManager
             {
                 foreach (var c in _categories)
                 {
-                    if (c.Id == CategoryId.ByExtension) continue;
+                    if (c.Id == CategoryId.ByExtension || c.Id == CategoryId.GlobalSearch) continue;
                     try { c.Count = MenuService.ScanCategory(c.Id).Count; }
                     catch { c.Count = null; }
                 }
@@ -107,17 +111,26 @@ namespace ContextMenuManager
             var cat = CurrentCategory;
             if (cat == null) return;
 
+            // 如果切换到非全局搜索分类，退出全局搜索模式
+            if (cat.Id != CategoryId.GlobalSearch)
+                _isGlobalSearchMode = false;
+
             CatTitle.Text = cat.Title;
             CatDesc.Text = cat.Description;
             ExtPanel.Visibility = cat.Id == CategoryId.ByExtension ? Visibility.Visible : Visibility.Collapsed;
-            Win11Tip.Visibility = MenuService.IsWindows11 && cat.Id != CategoryId.SendTo && cat.Id != CategoryId.NewMenu
+            Win11Tip.Visibility = MenuService.IsWindows11 && cat.Id != CategoryId.SendTo && cat.Id != CategoryId.NewMenu && cat.Id != CategoryId.GlobalSearch
                 ? Visibility.Visible : Visibility.Collapsed;
 
             WithWaitCursor(delegate
             {
                 try
                 {
-                    if (cat.Id == CategoryId.ByExtension)
+                    if (cat.Id == CategoryId.GlobalSearch)
+                    {
+                        // 全局搜索分类不自动加载，等待用户输入搜索关键字
+                        _entries = new List<MenuEntry>();
+                    }
+                    else if (cat.Id == CategoryId.ByExtension)
                     {
                         _entries = string.IsNullOrEmpty(_currentExt)
                             ? new List<MenuEntry>()
@@ -129,6 +142,8 @@ namespace ContextMenuManager
                         cat.Count = _entries.Count;
                         CategoryList.Items.Refresh();
                     }
+                    // 为所有扫描到的项匹配关联软件
+                    SoftwareMappingService.MatchSoftwareForEntries(_entries);
                 }
                 catch (Exception ex)
                 {
@@ -156,6 +171,8 @@ namespace ContextMenuManager
                 case "名称": return "DisplayName";
                 case "类型": return "TypeLabel";
                 case "位置": return "SourceLabel";
+                case "分类": return "CategoryName";
+                case "关联软件": return "AssociatedSoftware";
                 case "命令 / 详情": return "Details";
                 default: return null;
             }
@@ -244,7 +261,8 @@ namespace ContextMenuManager
                         || ContainsIgnoreCase(e.RawName, q)
                         || ContainsIgnoreCase(e.Details, q)
                         || ContainsIgnoreCase(e.KeyPath, q)
-                        || ContainsIgnoreCase(e.SourceLabel, q);
+                        || ContainsIgnoreCase(e.SourceLabel, q)
+                        || ContainsIgnoreCase(e.AssociatedSoftware, q);
                 };
             }
             UpdateCountAndEmptyHint();
@@ -290,13 +308,88 @@ namespace ContextMenuManager
         {
             if (_suppressLoad) return;
             SearchBox.Text = "";
+            _isGlobalSearchMode = false; // 切换分类时退出全局搜索模式
             LoadCategory();
         }
 
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             SearchHint.Visibility = string.IsNullOrEmpty(SearchBox.Text) ? Visibility.Visible : Visibility.Collapsed;
-            ApplyFilter();
+            
+            string q = (SearchBox.Text ?? "").Trim();
+            
+            // 如果搜索框有内容且不在全局搜索模式，自动切换到全局搜索
+            if (q.Length > 0 && !_isGlobalSearchMode)
+            {
+                _isGlobalSearchMode = true;
+                PerformGlobalSearch(q);
+            }
+            else if (q.Length == 0 && _isGlobalSearchMode)
+            {
+                // 搜索框清空时，退出全局搜索模式
+                _isGlobalSearchMode = false;
+                LoadCategory();
+            }
+            else if (_isGlobalSearchMode)
+            {
+                // 在全局搜索模式下，更新搜索结果
+                PerformGlobalSearch(q);
+            }
+            else
+            {
+                // 在普通分类模式下，只在当前分类中过滤
+                ApplyFilter();
+            }
+        }
+
+        /// <summary>执行全局搜索（跨所有分类）</summary>
+        private void PerformGlobalSearch(string keyword)
+        {
+            if (string.IsNullOrWhiteSpace(keyword))
+            {
+                _isGlobalSearchMode = false;
+                LoadCategory();
+                return;
+            }
+
+            WithWaitCursor(delegate
+            {
+                try
+                {
+                    // 扫描所有分类
+                    _globalSearchResults = MenuService.ScanCategory(CategoryId.GlobalSearch);
+                    
+                    // 为所有项匹配关联软件
+                    SoftwareMappingService.MatchSoftwareForEntries(_globalSearchResults);
+                    
+                    // 过滤匹配关键字的项
+                    _entries = _globalSearchResults.Where(e =>
+                        ContainsIgnoreCase(e.DisplayName, keyword) ||
+                        ContainsIgnoreCase(e.RawName, keyword) ||
+                        ContainsIgnoreCase(e.Details, keyword) ||
+                        ContainsIgnoreCase(e.KeyPath, keyword) ||
+                        ContainsIgnoreCase(e.SourceLabel, keyword) ||
+                        ContainsIgnoreCase(e.AssociatedSoftware, keyword) ||
+                        ContainsIgnoreCase(e.CategoryName, keyword)
+                    ).ToList();
+                    
+                    CatTitle.Text = "全局搜索结果";
+                    CatDesc.Text = string.Format("在所有分类中搜索「{0}」，找到 {1} 项匹配结果。", keyword, _entries.Count);
+                    ExtPanel.Visibility = Visibility.Collapsed;
+                    Win11Tip.Visibility = Visibility.Collapsed;
+                }
+                catch (Exception ex)
+                {
+                    _entries = new List<MenuEntry>();
+                    SetStatus("全局搜索失败：" + ex.Message);
+                }
+
+                ItemList.ItemsSource = _entries;
+                var view = CollectionViewSource.GetDefaultView(ItemList.ItemsSource);
+                if (view != null) view.Filter = null; // 全局搜索已经过滤，不再需要额外过滤
+                ResetSort();
+                UpdateCountAndEmptyHint();
+            });
         }
 
         private void BtnExtQuery_Click(object sender, RoutedEventArgs e)
@@ -331,6 +424,18 @@ namespace ContextMenuManager
             SetStatus("已刷新");
         }
 
+        private void BtnManageMappings_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new SoftwareMappingWindow { Owner = this };
+            if (dlg.ShowDialog() == true)
+            {
+                // 映射规则已更新，重新匹配所有项
+                SoftwareMappingService.MatchSoftwareForEntries(_entries);
+                ItemList.Items.Refresh();
+                SetStatus("关联软件映射规则已更新");
+            }
+        }
+
         #endregion
 
         #region 事件：行操作
@@ -359,6 +464,131 @@ namespace ContextMenuManager
                 SetStatus("已复制：" + entry.FullLocation);
             }
             catch { }
+        }
+
+        private void CtxSetSoftware_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = ItemList.SelectedItem as MenuEntry;
+            if (entry == null) return;
+
+            // 提示用户输入关联软件名称
+            var dlg = new SoftwareNameInputDialog(entry.AssociatedSoftware) { Owner = this };
+            if (dlg.ShowDialog() == true)
+            {
+                entry.AssociatedSoftware = dlg.SoftwareName;
+                ItemList.Items.Refresh();
+                SetStatus("已设置关联软件：" + entry.DisplayName + " → " + dlg.SoftwareName);
+            }
+        }
+
+        private void CtxClearSoftware_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = ItemList.SelectedItem as MenuEntry;
+            if (entry == null) return;
+
+            if (string.IsNullOrEmpty(entry.AssociatedSoftware))
+            {
+                MessageBox.Show(this, "该项目未设置关联软件。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            entry.AssociatedSoftware = null;
+            ItemList.Items.Refresh();
+            SetStatus("已清除关联软件：" + entry.DisplayName);
+        }
+
+        private void CtxAddMapping_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = ItemList.SelectedItem as MenuEntry;
+            if (entry == null) return;
+
+            // 智能提取关键字建议
+            string suggestedKeyword = ExtractKeywordSuggestion(entry);
+            string suggestedSoftware = entry.AssociatedSoftware ?? "";
+
+            var dlg = new SoftwareMappingEditDialog(suggestedKeyword, suggestedSoftware) { Owner = this };
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    // 检查关键字是否已存在
+                    if (SoftwareMappingService.ContainsKeyword(dlg.Keyword))
+                    {
+                        var result = MessageBox.Show(this,
+                            "关键字「" + dlg.Keyword + "」已存在，是否要覆盖原有映射？",
+                            "确认", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                        if (result != MessageBoxResult.Yes)
+                            return;
+                    }
+
+                    SoftwareMappingService.SetMapping(dlg.Keyword, dlg.SoftwareName);
+                    SoftwareMappingService.SaveMappings();
+
+                    // 重新匹配所有项
+                    SoftwareMappingService.MatchSoftwareForEntries(_entries);
+                    ItemList.Items.Refresh();
+
+                    SetStatus("已添加映射规则：" + dlg.Keyword + " → " + dlg.SoftwareName);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, "添加映射规则失败：" + ex.Message, "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        /// <summary>智能提取关键字建议</summary>
+        private string ExtractKeywordSuggestion(MenuEntry entry)
+        {
+            if (entry == null) return "";
+
+            // 优先从 Details 中提取 DLL 文件名
+            if (!string.IsNullOrEmpty(entry.Details))
+            {
+                // 查找 .dll 文件
+                var match = System.Text.RegularExpressions.Regex.Match(entry.Details, @"([^\\/\s]+)\.dll", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    string dllName = match.Groups[1].Value;
+                    // 移除常见的后缀
+                    dllName = System.Text.RegularExpressions.Regex.Replace(dllName, @"(ShellExt|Shell|Ctx|Handler|Menu|64|32)$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (dllName.Length > 2)
+                        return dllName;
+                }
+
+                // 查找 .exe 文件
+                match = System.Text.RegularExpressions.Regex.Match(entry.Details, @"([^\\/\s]+)\.exe", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    return match.Groups[1].Value;
+                }
+            }
+
+            // 从 RawName 提取
+            if (!string.IsNullOrEmpty(entry.RawName))
+            {
+                string raw = entry.RawName;
+                // 如果是 GUID 格式，跳过
+                if (!raw.StartsWith("{"))
+                {
+                    raw = System.Text.RegularExpressions.Regex.Replace(raw, @"(ShellExt|Shell|Ctx|Handler|Menu)$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (raw.Length > 2)
+                        return raw;
+                }
+            }
+
+            // 从 DisplayName 提取（移除特殊字符）
+            if (!string.IsNullOrEmpty(entry.DisplayName))
+            {
+                string name = entry.DisplayName;
+                // 移除括号及其内容
+                name = System.Text.RegularExpressions.Regex.Replace(name, @"[\(\（].*?[\)\）]", "");
+                name = name.Trim();
+                if (name.Length > 2 && name.Length < 30)
+                    return name;
+            }
+
+            return "";
         }
 
         private void ToggleEntry(MenuEntry entry)

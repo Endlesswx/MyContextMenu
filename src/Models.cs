@@ -53,7 +53,8 @@ namespace ContextMenuManager
         Folders,
         Drives,
         SendTo,
-        ByExtension
+        ByExtension,
+        GlobalSearch // 全局搜索（跨分类）
     }
 
     /// <summary>一条右键菜单项</summary>
@@ -75,6 +76,15 @@ namespace ContextMenuManager
 
         /// <summary>命令行 / DLL 路径 / 模板方式 / 快捷方式目标</summary>
         public string Details { get; set; }
+
+        /// <summary>关联软件名称</summary>
+        public string AssociatedSoftware { get; set; }
+
+        /// <summary>所属分类（用于全局搜索时显示来源）</summary>
+        public CategoryId Category { get; set; }
+
+        /// <summary>分类友好名称（用于全局搜索显示）</summary>
+        public string CategoryName { get; set; }
 
         public bool Enabled { get; set; }
 

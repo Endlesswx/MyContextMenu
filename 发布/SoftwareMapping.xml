@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--右键菜单关联软件映射配置-->
+<!--Keyword: 用于匹配的关键字（不区分大小写），程序会在菜单项的名称、命令、DLL路径等信息中搜索-->
+<!--Software: 关联的软件名称，将显示在「关联软件」列中-->
+<SoftwareMappings>
+  <Mapping Keyword="7-Zip" Software="7-Zip" />
+  <Mapping Keyword="AABdzCtx" Software="Bandizip" />
+  <Mapping Keyword="Everything" Software="Everything" />
+  <Mapping Keyword="GitExtensions" Software="Git Extensions" />
+  <Mapping Keyword="ModernSharing" Software="共享" />
+  <Mapping Keyword="Notepad++" Software="Notepad++" />
+  <Mapping Keyword="PotPlayer" Software="PotPlayer" />
+  <Mapping Keyword="qingshellext" Software="WPS网盘/云文档" />
+  <Mapping Keyword="TortoiseGit" Software="TortoiseGit" />
+  <Mapping Keyword="TortoiseSVN" Software="TortoiseSVN" />
+  <Mapping Keyword="VSCode" Software="Visual Studio Code" />
+  <Mapping Keyword="WinRAR" Software="WinRAR" />
+  <Mapping Keyword="YunShellExplorerCommand" Software="百度网盘" />
+  <Mapping Keyword="YunShellExt" Software="百度网盘" />
+</SoftwareMappings>

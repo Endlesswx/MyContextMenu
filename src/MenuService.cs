@@ -78,41 +78,59 @@ namespace ContextMenuManager
             switch (id)
             {
                 case CategoryId.DesktopBackground:
-                    ScanShellRoot(@"Directory\Background", "桌面/窗口空白处", list);
-                    ScanShellRoot("DesktopBackground", "桌面（系统项）", list);
+                    ScanShellRoot(@"Directory\Background", "桌面/窗口空白处", list, id, "桌面右键菜单");
+                    ScanShellRoot("DesktopBackground", "桌面（系统项）", list, id, "桌面右键菜单");
                     break;
                 case CategoryId.AllFiles:
-                    ScanShellRoot("*", "所有文件", list);
-                    ScanShellRoot("AllFilesystemObjects", "文件与文件夹", list);
+                    ScanShellRoot("*", "所有文件", list, id, "文件右键菜单");
+                    ScanShellRoot("AllFilesystemObjects", "文件与文件夹", list, id, "文件右键菜单");
                     break;
                 case CategoryId.Folders:
-                    ScanShellRoot("Directory", "文件夹（目录）", list);
-                    ScanShellRoot("Folder", "文件夹（通用）", list);
+                    ScanShellRoot("Directory", "文件夹（目录）", list, id, "文件夹右键菜单");
+                    ScanShellRoot("Folder", "文件夹（通用）", list, id, "文件夹右键菜单");
                     break;
                 case CategoryId.Drives:
-                    ScanShellRoot("Drive", "驱动器", list);
+                    ScanShellRoot("Drive", "驱动器", list, id, "驱动器右键菜单");
                     break;
                 case CategoryId.NewMenu:
-                    ScanNewMenu(list);
+                    ScanNewMenu(list, id, "「新建」菜单");
                     break;
                 case CategoryId.SendTo:
-                    ScanSendTo(list);
+                    ScanSendTo(list, id, "「发送到」菜单");
                     break;
                 case CategoryId.ByExtension:
                     ScanByExtension(extension, list);
+                    break;
+                case CategoryId.GlobalSearch:
+                    // 全局搜索：扫描所有分类
+                    ScanAllCategories(list);
                     break;
             }
             return list;
         }
 
-        /// <summary>扫描某根键下的 shell（verb）与 shellex\ContextMenuHandlers（COM 扩展）</summary>
-        private static void ScanShellRoot(string root, string sourceLabel, List<MenuEntry> list)
+        /// <summary>扫描所有分类（用于全局搜索）</summary>
+        private static void ScanAllCategories(List<MenuEntry> list)
         {
-            ScanShellVerbs(root, sourceLabel, list);
-            ScanShellExHandlers(root, sourceLabel, list);
+            ScanShellRoot(@"Directory\Background", "桌面/窗口空白处", list, CategoryId.DesktopBackground, "桌面右键菜单");
+            ScanShellRoot("DesktopBackground", "桌面（系统项）", list, CategoryId.DesktopBackground, "桌面右键菜单");
+            ScanShellRoot("*", "所有文件", list, CategoryId.AllFiles, "文件右键菜单");
+            ScanShellRoot("AllFilesystemObjects", "文件与文件夹", list, CategoryId.AllFiles, "文件右键菜单");
+            ScanShellRoot("Directory", "文件夹（目录）", list, CategoryId.Folders, "文件夹右键菜单");
+            ScanShellRoot("Folder", "文件夹（通用）", list, CategoryId.Folders, "文件夹右键菜单");
+            ScanShellRoot("Drive", "驱动器", list, CategoryId.Drives, "驱动器右键菜单");
+            ScanNewMenu(list, CategoryId.NewMenu, "「新建」菜单");
+            ScanSendTo(list, CategoryId.SendTo, "「发送到」菜单");
         }
 
-        private static void ScanShellVerbs(string root, string sourceLabel, List<MenuEntry> list)
+        /// <summary>扫描某根键下的 shell（verb）与 shellex\ContextMenuHandlers（COM 扩展）</summary>
+        private static void ScanShellRoot(string root, string sourceLabel, List<MenuEntry> list, CategoryId category = CategoryId.AllFiles, string categoryName = "")
+        {
+            ScanShellVerbs(root, sourceLabel, list, category, categoryName);
+            ScanShellExHandlers(root, sourceLabel, list, category, categoryName);
+        }
+
+        private static void ScanShellVerbs(string root, string sourceLabel, List<MenuEntry> list, CategoryId category = CategoryId.AllFiles, string categoryName = "")
         {
             using (var shell = RegistryHelper.OpenHkcr(root + @"\shell"))
             {
@@ -130,6 +148,8 @@ namespace ContextMenuManager
                                 RawName = name,
                                 KeyPath = root + @"\shell\" + name,
                                 SourceLabel = sourceLabel,
+                                Category = category,
+                                CategoryName = categoryName,
                             };
                             e.DisplayName = ResolveVerbDisplayName(vk, name);
                             e.Enabled = vk.GetValue("LegacyDisable") == null
@@ -224,7 +244,7 @@ namespace ContextMenuManager
             enabled = string.IsNullOrEmpty(defaultValue) || !defaultValue.StartsWith("-");
         }
 
-        private static void ScanShellExHandlers(string root, string sourceLabel, List<MenuEntry> list)
+        private static void ScanShellExHandlers(string root, string sourceLabel, List<MenuEntry> list, CategoryId category = CategoryId.AllFiles, string categoryName = "")
         {
             string path = root + @"\shellex\ContextMenuHandlers";
             using (var handlers = RegistryHelper.OpenHkcr(path))
@@ -249,6 +269,8 @@ namespace ContextMenuManager
                                 KeyPath = path + @"\" + name,
                                 SourceLabel = sourceLabel,
                                 Enabled = enabled,
+                                Category = category,
+                                CategoryName = categoryName,
                             };
 
                             string friendly = null, dll = null;
@@ -291,10 +313,10 @@ namespace ContextMenuManager
             return false;
         }
 
-        private static void ScanNewMenu(List<MenuEntry> list)
+        private static void ScanNewMenu(List<MenuEntry> list, CategoryId category = CategoryId.NewMenu, string categoryName = "「新建」菜单")
         {
             // 「新建 > 文件夹」
-            AddShellNewEntry("Folder", "文件夹", list);
+            AddShellNewEntry("Folder", "文件夹", list, null, category, categoryName);
 
             string[] rootNames;
             try { rootNames = Registry.ClassesRoot.GetSubKeyNames(); }
@@ -313,17 +335,17 @@ namespace ContextMenuManager
                     if (string.IsNullOrEmpty(typeName))
                         typeName = ext.TrimStart('.').ToUpperInvariant() + " 文件";
 
-                    AddShellNewEntry(ext, typeName, list);
+                    AddShellNewEntry(ext, typeName, list, null, category, categoryName);
 
                     // .ext\<ProgID>\ShellNew 形式
                     if (!string.IsNullOrEmpty(progId))
-                        AddShellNewEntry(ext + "\\" + progId, typeName, list, ext);
+                        AddShellNewEntry(ext + "\\" + progId, typeName, list, ext, category, categoryName);
                 }
                 catch { }
             }
 
             // 商店应用（MSIX 包）注册的「新建」项（如 记事本→文本文档、画图→BMP 图像）
-            AddPackagedNewEntries(list);
+            AddPackagedNewEntries(list, category, categoryName);
 
             list.Sort(CompareNewMenuEntries);
         }
@@ -336,7 +358,7 @@ namespace ContextMenuManager
         /// 通过该缓存反查仍然安装的包即可列出这些项；
         /// 屏蔽方式为改写该缓存显示名（追加超长内容使其从菜单消失，可逆恢复）。
         /// </summary>
-        private static void AddPackagedNewEntries(List<MenuEntry> list)
+        private static void AddPackagedNewEntries(List<MenuEntry> list, CategoryId category = CategoryId.NewMenu, string categoryName = "「新建」菜单")
         {
             // 已存在（经典 ShellNew）的扩展名，避免重复
             var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -364,7 +386,7 @@ namespace ContextMenuManager
                         using (var pkgKey = mrt.OpenSubKey(pkgEncoded))
                         {
                             if (pkgKey == null) continue;
-                            CollectShellNewNames(pkgKey, pkgDir, found);
+                            CollectShellNewNames(pkgKey, pkgDir, found, category, categoryName);
                         }
                     }
                 }
@@ -397,7 +419,7 @@ namespace ContextMenuManager
         private static readonly string PackagedBlockPadding = new string('█', 400); // 300 个实心方块（可见字符，外壳不裁剪）
 
         /// <summary>在某包资源缓存子树中查找 ShellNewDisplayName_&lt;ext&gt; 值</summary>
-        private static void CollectShellNewNames(RegistryKey key, string pkgDir, Dictionary<string, MenuEntry> found)
+        private static void CollectShellNewNames(RegistryKey key, string pkgDir, Dictionary<string, MenuEntry> found, CategoryId category = CategoryId.NewMenu, string categoryName = "「新建」菜单")
         {
             try
             {
@@ -430,6 +452,8 @@ namespace ContextMenuManager
                         SourceLabel = "商店应用（内置）",
                         Details = "由应用包提供：" + System.IO.Path.GetFileName(pkgDir),
                         Enabled = !blocked,
+                        Category = category,
+                        CategoryName = categoryName,
                     };
                 }
             }
@@ -441,7 +465,7 @@ namespace ContextMenuManager
                 {
                     using (var sk = key.OpenSubKey(sn))
                     {
-                        if (sk != null) CollectShellNewNames(sk, pkgDir, found);
+                        if (sk != null) CollectShellNewNames(sk, pkgDir, found, category, categoryName);
                     }
                 }
             }
@@ -561,7 +585,7 @@ namespace ContextMenuManager
         }
 
         /// <summary>检查 ownerPath 下的 ShellNew / ShellNew-，找到则加入列表</summary>
-        private static void AddShellNewEntry(string ownerPath, string typeName, List<MenuEntry> list, string displayExt = null)
+        private static void AddShellNewEntry(string ownerPath, string typeName, List<MenuEntry> list, string displayExt = null, CategoryId category = CategoryId.NewMenu, string categoryName = "「新建」菜单")
         {
             string activePath = ownerPath + @"\ShellNew";
             string disabledPath = ownerPath + @"\ShellNew-";
@@ -600,6 +624,8 @@ namespace ContextMenuManager
                 SourceLabel = "「新建」菜单",
                 Details = mechanism,
                 Enabled = activeValid,
+                Category = category,
+                CategoryName = categoryName,
             });
         }
 
@@ -622,7 +648,7 @@ namespace ContextMenuManager
             get { return Environment.GetFolderPath(Environment.SpecialFolder.SendTo); }
         }
 
-        private static void ScanSendTo(List<MenuEntry> list)
+        private static void ScanSendTo(List<MenuEntry> list, CategoryId category = CategoryId.SendTo, string categoryName = "「发送到」菜单")
         {
             string dir = SendToFolder;
             if (!Directory.Exists(dir)) return;
@@ -664,6 +690,8 @@ namespace ContextMenuManager
                         SourceLabel = "「发送到」文件夹",
                         Details = details,
                         Enabled = (attr & FileAttributes.Hidden) == 0,
+                        Category = category,
+                        CategoryName = categoryName,
                     });
                 }
                 catch { }
@@ -690,17 +718,17 @@ namespace ContextMenuManager
             ext = ext.ToLowerInvariant();
 
             // 1. .ext 键自身
-            ScanShellRoot(ext, "扩展名（" + ext + "）", list);
+            ScanShellRoot(ext, "扩展名（" + ext + "）", list, CategoryId.ByExtension, "按后缀名查询");
 
             // 2. 关联的 ProgID
             string progId = RegistryHelper.GetDefaultValue(ext);
             if (!string.IsNullOrEmpty(progId) && RegistryHelper.KeyExists(progId))
-                ScanShellRoot(progId, "关联类型（" + progId + "）", list);
+                ScanShellRoot(progId, "关联类型（" + progId + "）", list, CategoryId.ByExtension, "按后缀名查询");
 
             // 3. SystemFileAssociations\.ext
             string sfa = @"SystemFileAssociations\" + ext;
             if (RegistryHelper.KeyExists(sfa))
-                ScanShellRoot(sfa, "系统关联（" + ext + "）", list);
+                ScanShellRoot(sfa, "系统关联（" + ext + "）", list, CategoryId.ByExtension, "按后缀名查询");
 
             // 4. PerceivedType（如 image / text / audio / video）
             string perceived = null;
@@ -712,20 +740,20 @@ namespace ContextMenuManager
             {
                 string pf = @"SystemFileAssociations\" + perceived;
                 if (RegistryHelper.KeyExists(pf))
-                    ScanShellRoot(pf, "类别（" + perceived + "）", list);
+                    ScanShellRoot(pf, "类别（" + perceived + "）", list, CategoryId.ByExtension, "按后缀名查询");
             }
 
             // 5. 该扩展名的「新建」菜单项
             string typeName = null;
             if (!string.IsNullOrEmpty(progId)) typeName = RegistryHelper.GetDefaultValue(progId);
             if (string.IsNullOrEmpty(typeName)) typeName = ext.TrimStart('.').ToUpperInvariant() + " 文件";
-            AddShellNewEntry(ext, typeName, list);
+            AddShellNewEntry(ext, typeName, list, null, CategoryId.ByExtension, "按后缀名查询");
             if (!string.IsNullOrEmpty(progId))
-                AddShellNewEntry(ext + "\\" + progId, typeName, list, ext);
+                AddShellNewEntry(ext + "\\" + progId, typeName, list, ext, CategoryId.ByExtension, "按后缀名查询");
 
             // 6. 商店应用（MSIX 包）为该扩展名注册的「新建」项
             var packaged = new List<MenuEntry>();
-            AddPackagedNewEntries(packaged);
+            AddPackagedNewEntries(packaged, CategoryId.ByExtension, "按后缀名查询");
             foreach (var e in packaged)
                 if (string.Equals(e.RawName, ext, StringComparison.OrdinalIgnoreCase))
                     list.Add(e);

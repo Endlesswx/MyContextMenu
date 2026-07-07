@@ -11,3 +11,9 @@ D:\Coding\MyContextMenu\src\obj\Release\ContextMenuManager.g.resources
 D:\Coding\MyContextMenu\src\obj\Release\ContextMenuManager.exe
 D:\Coding\MyContextMenu\src\obj\Release\GeneratedInternalTypeHelper.g.cs
 D:\Coding\MyContextMenu\src\obj\Release\ContextMenuManager_MarkupCompile.lref
+D:\Coding\MyContextMenu\src\obj\Release\SoftwareMappingWindow.baml
+D:\Coding\MyContextMenu\src\obj\Release\SoftwareMappingEditDialog.baml
+D:\Coding\MyContextMenu\src\obj\Release\SoftwareMappingWindow.g.cs
+D:\Coding\MyContextMenu\src\obj\Release\SoftwareMappingEditDialog.g.cs
+D:\Coding\MyContextMenu\src\obj\Release\SoftwareNameInputDialog.baml
+D:\Coding\MyContextMenu\src\obj\Release\SoftwareNameInputDialog.g.cs

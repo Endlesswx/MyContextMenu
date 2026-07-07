@@ -1,0 +1,30 @@
+﻿<Window x:Class="ContextMenuManager.SoftwareNameInputDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="设置关联软件"
+        Height="220" Width="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#F5F6F8"
+        FontFamily="Microsoft YaHei UI, Segoe UI, sans-serif" FontSize="13">
+    <DockPanel>
+        <!-- 底部按钮 -->
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="{StaticResource BorderGray}"
+                BorderThickness="0,1,0,0" Padding="18,10">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="BtnOk" Style="{StaticResource PrimaryBtn}" Content="确定" Click="BtnOk_Click" IsDefault="True"/>
+                <Button x:Name="BtnCancel" Style="{StaticResource Btn}" Content="取消" Margin="0" Click="BtnCancel_Click" IsCancel="True"/>
+            </StackPanel>
+        </Border>
+
+        <!-- 表单 -->
+        <StackPanel Margin="18,18,18,14">
+            <TextBlock Text="软件名称" Foreground="#555555" FontWeight="SemiBold"/>
+            <TextBox x:Name="TxtSoftware" Margin="0,6,0,0" Padding="8,6"
+                     ToolTip="设置此菜单项关联的软件名称"/>
+            <TextBlock Margin="0,4,0,0" Foreground="#888888" FontSize="12" TextWrapping="Wrap">
+                此设置仅影响当前菜单项的显示，不会创建映射规则。如需为多个相似项目批量设置，请使用「添加为新映射规则」。
+            </TextBlock>
+        </StackPanel>
+    </DockPanel>
+</Window>

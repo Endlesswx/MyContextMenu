@@ -20,6 +20,8 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button x:Name="BtnAdd" Style="{StaticResource PrimaryBtn}" Content="＋ 新增菜单项" Click="BtnAdd_Click"/>
+                    <Button x:Name="BtnManageMappings" Style="{StaticResource Btn}" Content="管理关联软件" Click="BtnManageMappings_Click"
+                            ToolTip="管理关键字与软件名称的映射规则"/>
                     <Button x:Name="BtnRefresh" Style="{StaticResource Btn}" Content="刷新" Click="BtnRefresh_Click"/>
                     <Button x:Name="BtnWin11" Style="{StaticResource Btn}" Click="BtnWin11_Click"
                             Visibility="Collapsed"
@@ -129,6 +131,18 @@
                                 <Separator/>
                                 <MenuItem Header="定位（注册表 / 文件）" Click="CtxLocate_Click"/>
                                 <MenuItem Header="复制位置路径" Click="CtxCopy_Click"/>
+                                <Separator/>
+                                <MenuItem x:Name="CtxSetSoftware" Header="设置关联软件..." Click="CtxSetSoftware_Click">
+                                    <MenuItem.Icon>
+                                        <TextBlock Text="🔗" FontSize="14"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem x:Name="CtxClearSoftware" Header="清除关联软件" Click="CtxClearSoftware_Click"/>
+                                <MenuItem x:Name="CtxAddMapping" Header="添加为新映射规则..." Click="CtxAddMapping_Click">
+                                    <MenuItem.Icon>
+                                        <TextBlock Text="+" FontSize="14" FontWeight="Bold"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
                             </ContextMenu>
                         </ListView.ContextMenu>
                         <ListView.View>
@@ -169,7 +183,7 @@
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
-                                <GridViewColumn Header="位置" Width="140">
+                                <GridViewColumn Header="位置" Width="120">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding SourceLabel}" Foreground="#666666"
@@ -178,7 +192,25 @@
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
-                                <GridViewColumn Header="命令 / 详情" Width="300">
+                                <GridViewColumn Header="分类" Width="100">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding CategoryName}" Foreground="#888888"
+                                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                       ToolTip="{Binding CategoryName}"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="关联软件" Width="110">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding AssociatedSoftware}" Foreground="#4A90E2"
+                                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                       ToolTip="{Binding AssociatedSoftware}"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="命令 / 详情" Width="260">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding Details}" Foreground="#888888"

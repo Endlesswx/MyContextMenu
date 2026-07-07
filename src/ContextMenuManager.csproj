@@ -42,6 +42,7 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Xaml" />
     <Reference Include="WindowsBase" />
@@ -62,6 +63,18 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="SoftwareMappingWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="SoftwareMappingEditDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="SoftwareNameInputDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App.xaml.cs">
@@ -73,10 +86,20 @@
     <Compile Include="AddItemWindow.xaml.cs">
       <DependentUpon>AddItemWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="SoftwareMappingWindow.xaml.cs">
+      <DependentUpon>SoftwareMappingWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="SoftwareMappingEditDialog.xaml.cs">
+      <DependentUpon>SoftwareMappingEditDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="SoftwareNameInputDialog.xaml.cs">
+      <DependentUpon>SoftwareNameInputDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Models.cs" />
     <Compile Include="NativeMethods.cs" />
     <Compile Include="RegistryHelper.cs" />
     <Compile Include="MenuService.cs" />
+    <Compile Include="SoftwareMappingService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

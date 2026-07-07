@@ -1,0 +1,38 @@
+﻿<Window x:Class="ContextMenuManager.SoftwareMappingEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="编辑映射规则"
+        Height="280" Width="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#F5F6F8"
+        FontFamily="Microsoft YaHei UI, Segoe UI, sans-serif" FontSize="13">
+    <DockPanel>
+        <!-- 底部按钮 -->
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="{StaticResource BorderGray}"
+                BorderThickness="0,1,0,0" Padding="18,10">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="BtnOk" Style="{StaticResource PrimaryBtn}" Content="确定" Click="BtnOk_Click" IsDefault="True"/>
+                <Button x:Name="BtnCancel" Style="{StaticResource Btn}" Content="取消" Margin="0" Click="BtnCancel_Click" IsCancel="True"/>
+            </StackPanel>
+        </Border>
+
+        <!-- 表单 -->
+        <StackPanel Margin="18,18,18,14">
+            <TextBlock Text="关键字" Foreground="#555555" FontWeight="SemiBold"/>
+            <TextBox x:Name="TxtKeyword" Margin="0,6,0,0" Padding="8,6"
+                     FontFamily="Consolas, Courier New"
+                     ToolTip="用于匹配的关键字（不区分大小写），如：WinRAR、7-Zip、qingshellext 等"/>
+            <TextBlock Margin="0,4,0,0" Foreground="#888888" FontSize="12" TextWrapping="Wrap">
+                程序会在菜单项的名称、命令、DLL路径、注册表路径等字段中搜索此关键字。
+            </TextBlock>
+
+            <TextBlock Margin="0,16,0,0" Text="软件名称" Foreground="#555555" FontWeight="SemiBold"/>
+            <TextBox x:Name="TxtSoftware" Margin="0,6,0,0" Padding="8,6"
+                     ToolTip="关联的软件名称，将显示在「关联软件」列中"/>
+            <TextBlock Margin="0,4,0,0" Foreground="#888888" FontSize="12" TextWrapping="Wrap">
+                匹配成功后，在「关联软件」列中显示的名称，如：WinRAR、百度网盘、WPS网盘/云文档 等。
+            </TextBlock>
+        </StackPanel>
+    </DockPanel>
+</Window>
