@@ -142,6 +142,10 @@ namespace ContextMenuManager
                         using (var vk = shell.OpenSubKey(name))
                         {
                             if (vk == null) continue;
+
+                            // 过滤不会在右键菜单中显示的系统内部 verb
+                            if (IsHiddenSystemVerb(vk, name)) continue;
+
                             var e = new MenuEntry
                             {
                                 Kind = EntryKind.ShellVerb,
@@ -163,19 +167,85 @@ namespace ContextMenuManager
             }
         }
 
+        /// <summary>判断一个 verb 是否是不会在右键菜单中显示的系统内部项</summary>
+        private static bool IsHiddenSystemVerb(RegistryKey verbKey, string keyName)
+        {
+            // CommandStateHandler：可见性由 COM 对象在运行时控制，
+            // 结合 CommandStateSync 的 "HideDisabled" 时该项通常不可见
+            string csh = verbKey.GetValue("CommandStateHandler") as string;
+            if (!string.IsNullOrEmpty(csh))
+            {
+                // 检查 CommandStateSync：值为 "HideDisabled" 时该项被隐藏
+                // 但如果有 MUIVerb 或默认值（说明是正规菜单项），不过滤
+                // 只过滤那些既无 MUIVerb 又无默认值的纯内部 verb
+                string mui = verbKey.GetValue("MUIVerb") as string;
+                string def = verbKey.GetValue("") as string;
+                if (string.IsNullOrEmpty(mui) && string.IsNullOrEmpty(def))
+                    return true;
+            }
+
+            // 没有 command 子键且没有 SubCommands/ExtendedSubCommandsKey 的 verb
+            // 是无效项（无法执行也无子菜单）
+            using (var cmd = verbKey.OpenSubKey("command"))
+            {
+                if (cmd == null
+                    && verbKey.GetValue("SubCommands") == null
+                    && verbKey.GetValue("ExtendedSubCommandsKey") == null
+                    && verbKey.GetValue("DelegateExecute") == null)
+                {
+                    // 无 command 且无子菜单的 verb，通常是系统保留的占位项
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static string ResolveVerbDisplayName(RegistryKey verbKey, string keyName)
         {
             string mui = verbKey.GetValue("MUIVerb") as string;
             string def = verbKey.GetValue("") as string;
-            string name = !string.IsNullOrEmpty(mui) ? mui : def;
-            if (string.IsNullOrEmpty(name))
+
+            // 优先使用 MUIVerb
+            if (!string.IsNullOrEmpty(mui))
             {
-                string zh;
-                if (CanonicalVerbNames.TryGetValue(keyName, out zh)) return zh;
-                return keyName;
+                string resolved = NativeMethods.LoadIndirectString(mui);
+                // 如果解析成功（不再以 @ 开头），使用解析结果
+                if (!string.IsNullOrEmpty(resolved) && !resolved.StartsWith("@"))
+                    return CleanMenuName(resolved);
+                // MUIVerb 解析失败，尝试后备
             }
-            name = NativeMethods.LoadIndirectString(name);
-            return name.Replace("&", "");
+
+            // 其次使用默认值
+            if (!string.IsNullOrEmpty(def))
+            {
+                string resolved = NativeMethods.LoadIndirectString(def);
+                if (!string.IsNullOrEmpty(resolved) && !resolved.StartsWith("@"))
+                    return CleanMenuName(resolved);
+            }
+
+            // 再次尝试从规范 verb 名映射
+            string zh;
+            if (CanonicalVerbNames.TryGetValue(keyName, out zh)) return zh;
+
+            // 最终后备：如果 MUIVerb 或默认值有非空非 @ 的文本，使用它
+            if (!string.IsNullOrEmpty(mui) && !mui.StartsWith("@"))
+                return CleanMenuName(mui);
+            if (!string.IsNullOrEmpty(def) && !def.StartsWith("@"))
+                return CleanMenuName(def);
+
+            return keyName;
+        }
+
+        /// <summary>清理菜单名中的加速键标记和多余字符</summary>
+        private static string CleanMenuName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+            // 移除 (&X) 格式的加速键（如 "打印(&P)" → "打印"）
+            name = System.Text.RegularExpressions.Regex.Replace(name, @"\s*\(&.\)", "");
+            // 移除单独的 & 加速键标记（如 "&Edit" → "Edit"）
+            name = name.Replace("&", "");
+            return name.Trim();
         }
 
         private static string BuildVerbDetails(RegistryKey verbKey)
@@ -278,16 +348,39 @@ namespace ContextMenuManager
                             {
                                 if (ck != null)
                                 {
-                                    friendly = ck.GetValue("") as string;
+                                    // 优先尝试 LocalizedString（@dll,-xxx 形式的本地化名称）
+                                    string localized = ck.GetValue("LocalizedString") as string;
+                                    if (!string.IsNullOrEmpty(localized))
+                                    {
+                                        string resolved = NativeMethods.LoadIndirectString(localized);
+                                        if (!string.IsNullOrEmpty(resolved) && !resolved.StartsWith("@"))
+                                            friendly = resolved;
+                                    }
+                                    // 其次使用默认值
+                                    if (string.IsNullOrEmpty(friendly))
+                                    {
+                                        string clsDefault = ck.GetValue("") as string;
+                                        if (!string.IsNullOrEmpty(clsDefault))
+                                        {
+                                            // 如果默认值也是间接字符串，尝试解析
+                                            string resolved = NativeMethods.LoadIndirectString(clsDefault);
+                                            if (!string.IsNullOrEmpty(resolved) && !resolved.StartsWith("@"))
+                                                friendly = resolved;
+                                        }
+                                    }
                                     using (var srv = ck.OpenSubKey("InprocServer32"))
                                     {
                                         if (srv != null) dll = srv.GetValue("") as string;
                                     }
                                 }
                             }
+                            // 如果 CLSID 解析未获取到名称，使用默认值（非 GUID 部分）
                             if (string.IsNullOrEmpty(friendly) && !string.IsNullOrEmpty(def) && !IsGuid(StripClsidDisableMarks(def)))
                                 friendly = def;
-                            e.DisplayName = !string.IsNullOrEmpty(friendly) ? friendly : StripClsidDisableMarks(name);
+                            // 如果键名不是 GUID 格式且比 COM 名更有描述性，优先使用键名
+                            if (string.IsNullOrEmpty(friendly))
+                                friendly = IsGuid(StripClsidDisableMarks(name)) ? clsid : name;
+                            e.DisplayName = CleanMenuName(friendly);
                             e.Details = string.IsNullOrEmpty(dll) ? clsid : clsid + "  —  " + dll;
                             list.Add(e);
                         }
@@ -327,14 +420,9 @@ namespace ContextMenuManager
                 if (ext.Length < 2 || ext[0] != '.') continue;
                 try
                 {
-                    // 友好类型名：.ext 默认值 → ProgID → ProgID 默认值
-                    string progId = RegistryHelper.GetDefaultValue(ext);
-                    string typeName = null;
-                    if (!string.IsNullOrEmpty(progId))
-                        typeName = RegistryHelper.GetDefaultValue(progId);
-                    if (string.IsNullOrEmpty(typeName))
-                        typeName = ext.TrimStart('.').ToUpperInvariant() + " 文件";
+                    string typeName = ResolveShellNewTypeName(ext);
 
+                    string progId = RegistryHelper.GetDefaultValue(ext);
                     AddShellNewEntry(ext, typeName, list, null, category, categoryName);
 
                     // .ext\<ProgID>\ShellNew 形式
@@ -348,6 +436,52 @@ namespace ContextMenuManager
             AddPackagedNewEntries(list, category, categoryName);
 
             list.Sort(CompareNewMenuEntries);
+        }
+
+        /// <summary>
+        /// 解析「新建」菜单中某扩展名的友好类型名。
+        /// 优先级：FriendlyTypeName（.ext 或 ProgID 键） > ProgID 默认值 > 后备格式
+        /// Windows 资源管理器实际使用 FriendlyTypeName 来显示「新建」菜单项名称。
+        /// </summary>
+        private static string ResolveShellNewTypeName(string ext)
+        {
+            string progId = RegistryHelper.GetDefaultValue(ext);
+
+            // 1. 优先从 .ext 键读取 FriendlyTypeName
+            string friendlyName = TryResolveFriendlyTypeName(ext);
+            if (!string.IsNullOrEmpty(friendlyName)) return friendlyName;
+
+            // 2. 从 ProgID 键读取 FriendlyTypeName
+            if (!string.IsNullOrEmpty(progId))
+            {
+                friendlyName = TryResolveFriendlyTypeName(progId);
+                if (!string.IsNullOrEmpty(friendlyName)) return friendlyName;
+            }
+
+            // 3. ProgID 默认值
+            if (!string.IsNullOrEmpty(progId))
+            {
+                string progDefault = RegistryHelper.GetDefaultValue(progId);
+                if (!string.IsNullOrEmpty(progDefault)) return progDefault;
+            }
+
+            // 4. 后备
+            return ext.TrimStart('.').ToUpperInvariant() + " 文件";
+        }
+
+        /// <summary>尝试从注册表键读取并解析 FriendlyTypeName 值</summary>
+        private static string TryResolveFriendlyTypeName(string keyPath)
+        {
+            using (var k = RegistryHelper.OpenHkcr(keyPath))
+            {
+                if (k == null) return null;
+                string ftn = k.GetValue("FriendlyTypeName") as string;
+                if (string.IsNullOrEmpty(ftn)) return null;
+                string resolved = NativeMethods.LoadIndirectString(ftn);
+                if (!string.IsNullOrEmpty(resolved) && !resolved.StartsWith("@"))
+                    return resolved;
+            }
+            return null;
         }
 
         /// <summary>
@@ -743,10 +877,8 @@ namespace ContextMenuManager
                     ScanShellRoot(pf, "类别（" + perceived + "）", list, CategoryId.ByExtension, "按后缀名查询");
             }
 
-            // 5. 该扩展名的「新建」菜单项
-            string typeName = null;
-            if (!string.IsNullOrEmpty(progId)) typeName = RegistryHelper.GetDefaultValue(progId);
-            if (string.IsNullOrEmpty(typeName)) typeName = ext.TrimStart('.').ToUpperInvariant() + " 文件";
+            // 5. 该扩展名的「新建」菜单项（使用增强名称解析）
+            string typeName = ResolveShellNewTypeName(ext);
             AddShellNewEntry(ext, typeName, list, null, CategoryId.ByExtension, "按后缀名查询");
             if (!string.IsNullOrEmpty(progId))
                 AddShellNewEntry(ext + "\\" + progId, typeName, list, ext, CategoryId.ByExtension, "按后缀名查询");
