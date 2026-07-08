@@ -40,7 +40,6 @@ namespace ContextMenuManager
         private bool _globalSearchResultsCached = false; // 全局搜索结果是否已缓存
         private string _currentExt = "";
         private bool _suppressLoad;
-        private bool _isGlobalSearchMode = false; // 是否处于全局搜索模式
         private DispatcherTimer _searchDebounceTimer; // 搜索防抖定时器
         private string _lastSearchText = ""; // 缓存上次搜索文本，避免重复搜索
 
@@ -121,10 +120,6 @@ namespace ContextMenuManager
         {
             var cat = CurrentCategory;
             if (cat == null) return;
-
-            // 如果切换到非全局搜索分类，退出全局搜索模式
-            if (cat.Id != CategoryId.GlobalSearch)
-                _isGlobalSearchMode = false;
 
             CatTitle.Text = cat.Title;
             CatDesc.Text = cat.Description;
@@ -318,10 +313,17 @@ namespace ContextMenuManager
         private void CategoryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressLoad) return;
-            SearchBox.Text = "";
-            _isGlobalSearchMode = false; // 切换分类时退出全局搜索模式
             _globalSearchResultsCached = false; // 清除缓存
             LoadCategory();
+            // 切换分类时保留搜索关键字，在新分类下重新搜索
+            string q = (SearchBox.Text ?? "").Trim();
+            if (q.Length > 0)
+            {
+                var cat = CurrentCategory;
+                if (cat != null && cat.Id == CategoryId.GlobalSearch)
+                    PerformGlobalSearch(q);
+                // 普通分类下 LoadCategory() 末尾的 ApplyFilter() 已按当前关键字过滤
+            }
         }
 
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -338,10 +340,17 @@ namespace ContextMenuManager
             {
                 SearchHint.Visibility = Visibility.Collapsed;
             }
+            BtnClearSearch.Visibility = isEmpty ? Visibility.Collapsed : Visibility.Visible;
             
             // 重启定时器
             _searchDebounceTimer.Stop();
             _searchDebounceTimer.Start();
+        }
+
+        private void BtnClearSearch_Click(object sender, RoutedEventArgs e)
+        {
+            SearchBox.Text = "";
+            SearchBox.Focus();
         }
 
         /// <summary>搜索防抖定时器触发事件</summary>
@@ -358,26 +367,15 @@ namespace ContextMenuManager
             }
             _lastSearchText = q;
             
-            // 如果搜索框有内容且不在全局搜索模式，自动切换到全局搜索
-            if (q.Length > 0 && !_isGlobalSearchMode)
+            var cat = CurrentCategory;
+            if (cat != null && cat.Id == CategoryId.GlobalSearch)
             {
-                _isGlobalSearchMode = true;
-                PerformGlobalSearch(q);
-            }
-            else if (q.Length == 0 && _isGlobalSearchMode)
-            {
-                // 搜索框清空时，退出全局搜索模式
-                _isGlobalSearchMode = false;
-                LoadCategory();
-            }
-            else if (_isGlobalSearchMode)
-            {
-                // 在全局搜索模式下，更新搜索结果
+                // 全局搜索分类：跨所有分类搜索
                 PerformGlobalSearch(q);
             }
             else
             {
-                // 普通分类模式下的过滤
+                // 普通分类：仅在当前分类内过滤
                 ApplyFilter();
             }
         }
@@ -387,7 +385,6 @@ namespace ContextMenuManager
         {
             if (string.IsNullOrWhiteSpace(keyword))
             {
-                _isGlobalSearchMode = false;
                 LoadCategory();
                 return;
             }
